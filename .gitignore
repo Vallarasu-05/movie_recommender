@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+data/
+.env
+model/svd_movie_model.pkl
+model/movies_master.pkl
