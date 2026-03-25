@@ -1,6 +1,6 @@
-model/
-models/
-data/
-datasets/
-*.pkl
+# Ignore model files
+models/*.pkl
+models/*.zip
 __pycache__/
+*.pyc
+.env

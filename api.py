@@ -1,9 +1,10 @@
 from fastapi import FastAPI, HTTPException, Query
 from recommender import load_artifacts, recommend_cf, recommend_content, recommend_hybrid
+from typing import Optional
 
 app = FastAPI(title="Movie Recommender API")
 
-# Load once (VERY IMPORTANT)
+# Load once
 arts = load_artifacts()
 
 @app.get("/")
@@ -12,11 +13,10 @@ def home():
 
 @app.get("/recommend")
 def recommend(
-    user_id: int = Query(None),
-    movie_title: str = Query(None),
+    user_id: Optional[int] = Query(None),
+    movie_title: Optional[str] = Query(None),
     top_n: int = 5
 ):
-
     try:
         if user_id and movie_title:
             recs = recommend_hybrid(user_id, movie_title, top_n, arts)
@@ -31,13 +31,16 @@ def recommend(
             mode = "content"
 
         else:
-            raise HTTPException(400, "Provide user_id or movie_title")
+            raise HTTPException(status_code=400, detail="Provide user_id or movie_title")
 
+        # 🔥 FIX: return directly (no ["title"])
         return {
             "mode": mode,
             "count": len(recs),
-            "recommendations": [r["title"] for r in recs]
+            "recommendations": recs
         }
 
     except Exception as e:
-        raise HTTPException(500, str(e))
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
