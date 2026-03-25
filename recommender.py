@@ -7,29 +7,28 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics.pairwise import linear_kernel
 import gdown
+import streamlit as st
 
-MODEL_DIR = "models"
-ZIP_PATH = "models.zip"
+# ── Paths ──
+BASE_DIR = os.path.dirname(__file__)
+MODEL_DIR = os.path.join(BASE_DIR, "models")
+ZIP_PATH = os.path.join(BASE_DIR, "models.zip")
 
-# 🔽 DOWNLOAD + EXTRACT MODELS
+# ── DOWNLOAD + EXTRACT MODELS ──
 def download_and_extract():
     if not os.path.exists(MODEL_DIR):
-
-        print("⬇️ Downloading models zip...")
-
+        st.info("⬇️ Downloading models...")
         url = "https://drive.google.com/uc?id=1oeuasb6wO4uIF_ep7O3W0vYLx7tmyidu"
         gdown.download(url, ZIP_PATH, quiet=False)
 
-        print("📦 Extracting models...")
-
+        st.info("📦 Extracting models...")
         with zipfile.ZipFile(ZIP_PATH, 'r') as zip_ref:
-            zip_ref.extractall(".")
-
+            zip_ref.extractall(BASE_DIR)
         os.remove(ZIP_PATH)
-        print("✅ Models ready")
+        st.success("✅ Models ready")
 
-
-# 🔽 LOAD ARTIFACTS
+# ── LOAD ARTIFACTS (CACHED) ──
+@st.cache_resource(show_spinner=False)
 def load_artifacts():
     download_and_extract()
 
@@ -37,6 +36,7 @@ def load_artifacts():
         with open(os.path.join(MODEL_DIR, name), "rb") as f:
             return pickle.load(f)
 
+    # Models
     svd = _load("svd_movie_model.pkl")
     tfidf_genres = _load("tfidf_genres.pkl")
     tfidf_keywords = _load("tfidf_keywords.pkl")
@@ -45,7 +45,7 @@ def load_artifacts():
     indices = _load("indices.pkl")
     movies_master = pd.read_pickle(os.path.join(MODEL_DIR, "movies_master.pkl"))
 
-    # rebuild matrices
+    # Build TF-IDF matrices (cached for performance)
     matrix_genres = tfidf_genres.transform(movies_master['genres'].fillna(""))
     matrix_keywords = tfidf_keywords.transform(movies_master['keywords'].fillna(""))
     matrix_cast = tfidf_cast.transform(movies_master['cast'].fillna(""))
@@ -64,8 +64,7 @@ def load_artifacts():
         "matrix_overview": matrix_overview
     }
 
-
-# 🎯 CONTENT
+# ── CONTENT-BASED SIMILARITY ──
 def _content_similarity(idx, arts):
     return (
         linear_kernel(arts['matrix_genres'][idx], arts['matrix_genres']).flatten() * 3 +
@@ -73,7 +72,6 @@ def _content_similarity(idx, arts):
         linear_kernel(arts['matrix_cast'][idx], arts['matrix_cast']).flatten() * 1 +
         linear_kernel(arts['matrix_overview'][idx], arts['matrix_overview']).flatten() * 0.5
     )
-
 
 def recommend_content(movie_title, top_n, arts):
     indices = arts['indices']
@@ -83,10 +81,8 @@ def recommend_content(movie_title, top_n, arts):
         return []
 
     idx = indices[movie_title]
-
     if isinstance(idx, pd.Series):
         idx = idx.iloc[0]
-
     idx = int(idx)
 
     sim_scores = _content_similarity(idx, arts)
@@ -95,8 +91,7 @@ def recommend_content(movie_title, top_n, arts):
 
     return movies.iloc[ranked[:top_n]]['title'].tolist()
 
-
-# 🤝 CF
+# ── COLLABORATIVE FILTERING ──
 def recommend_cf(user_id, top_n, arts):
     svd = arts['svd']
     movie_ids = arts['movie_ids']
@@ -120,8 +115,7 @@ def recommend_cf(user_id, top_n, arts):
 
     return results
 
-
-# 🔀 HYBRID
+# ── HYBRID RECOMMENDER ──
 def recommend_hybrid(user_id, movie_title, top_n, arts):
     cf = recommend_cf(user_id, top_n * 2, arts)
     content = recommend_content(movie_title, top_n * 2, arts)
