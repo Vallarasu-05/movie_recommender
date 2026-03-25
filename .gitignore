@@ -1,0 +1,6 @@
+model/
+models/
+data/
+datasets/
+*.pkl
+__pycache__/
