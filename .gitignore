@@ -1,5 +1,4 @@
 # Ignore model files
-models/*.pkl
 models/*.zip
 __pycache__/
 *.pyc
